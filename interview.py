@@ -17,8 +17,7 @@ from utils import (
 # 0) SETTINGS
 # ============================================================
 # While testing redirects, keep example.com. For launch:
-# PROLIFIC_COMPLETE_URL = "https://app.prolific.com/submissions/complete?cc=YOURCODE"
-PROLIFIC_COMPLETE_URL = "https://example.com"
+PROLIFIC_COMPLETE_URL = "https://app.prolific.com/submissions/complete?cc=C1QA3C1R"
 
 # If LOGINS is False, we'll allow an admin bypass without Prolific params.
 # If LOGINS is True, you can open the app without Prolific params and log in.
