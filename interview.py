@@ -1,4 +1,21 @@
 import streamlit as st
+
+# Streamlit query params (newer Streamlit)
+params = st.query_params
+PROLIFIC_PID = params.get("PROLIFIC_PID")
+STUDY_ID     = params.get("STUDY_ID")
+SESSION_ID   = params.get("SESSION_ID")
+
+# Persist in session_state
+st.session_state.setdefault("PROLIFIC_PID", PROLIFIC_PID)
+st.session_state.setdefault("STUDY_ID", STUDY_ID)
+st.session_state.setdefault("SESSION_ID", SESSION_ID)
+
+# Hard-stop if they didn't come from Prolific (recommended for data integrity)
+if not st.session_state["PROLIFIC_PID"]:
+    st.error("Missing PROLIFIC_PID. Please start this study from Prolific.")
+    st.stop()
+
 import time
 from utils import (
     check_password,
