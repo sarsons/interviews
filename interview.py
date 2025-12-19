@@ -12,34 +12,64 @@ from utils import (
 )
 
 # ============================================================
-# 0) Redirect handler (MUST run at the top of the script)
-#    This is the ONLY place we actually execute JS navigation.
+# Prolific completion URL
+#   - Use https://example.com for testing
+#   - Replace with Prolific completion URL when ready:
+#     https://app.prolific.com/submissions/complete?cc=YOURCODE
 # ============================================================
-DEFAULT_TEST_REDIRECT_URL = "https://example.com"
+PROLIFIC_COMPLETE_URL = "https://example.com"
 
-if st.session_state.get("_redirect_now"):
-    url = st.session_state.get("_redirect_url", DEFAULT_TEST_REDIRECT_URL)
 
-    st.success("All done — returning you…")
-    st.link_button("Click here if you are not redirected", url)
+def completion_screen(url: str, title: str = "All done!", subtitle: str = ""):
+    """
+    Show a completion screen that:
+      1) ALWAYS provides a clickable link (reliable)
+      2) ALSO attempts auto-redirect (best-effort)
+    """
+    st.session_state["interview_active"] = False
 
+    st.markdown(f"## {title}")
+    if subtitle:
+        st.markdown(subtitle)
+
+    st.markdown("### Return to Prolific")
+    st.link_button("Return to Prolific", url)
+    st.markdown(f"If the button doesn’t work, click this link: {url}")
+
+    # Best-effort auto-redirect attempts (some environments block these)
     components.html(
-        f"""<script>window.top.location.href="{url}";</script>""",
+        f"""
+        <script>
+          // Try multiple redirect styles
+          try {{
+            window.top.location.href = "{url}";
+          }} catch (e) {{}}
+
+          setTimeout(function() {{
+            try {{
+              window.location.href = "{url}";
+            }} catch (e) {{}}
+          }}, 250);
+
+          setTimeout(function() {{
+            try {{
+              window.location.replace("{url}");
+            }} catch (e) {{}}
+          }}, 750);
+        </script>
+
+        <noscript>
+          <p>JavaScript is disabled. Please use the button above to return to Prolific.</p>
+        </noscript>
+        """,
         height=0,
     )
+
     st.stop()
 
 
-def arm_redirect_and_rerun(url: str, reason: str = ""):
-    """Arm redirect and force a rerun so redirect executes at the top of the next run."""
-    st.session_state["_redirect_now"] = True
-    st.session_state["_redirect_url"] = url
-    st.session_state["_redirect_reason"] = reason
-    st.rerun()
-
-
 # ============================================================
-# 1) Prolific parameters (capture + enforce)
+# Prolific parameters (capture + enforce)
 # ============================================================
 params = st.query_params
 st.session_state.setdefault("PROLIFIC_PID", params.get("PROLIFIC_PID"))
@@ -50,23 +80,16 @@ if not st.session_state["PROLIFIC_PID"]:
     st.error("Missing PROLIFIC_PID. Please start this study from Prolific.")
     st.stop()
 
-# Storage identifier is Prolific PID (do NOT change login identity logic)
+# Use Prolific PID as storage identifier (do NOT change login username logic)
 st.session_state.setdefault("storage_id", st.session_state["PROLIFIC_PID"])
 
 # ============================================================
-# 2) Completion URL (use example.com while testing)
-#    Replace with Prolific completion URL when ready, e.g.
-#    https://app.prolific.com/submissions/complete?cc=YOURCODE
-# ============================================================
-PROLIFIC_COMPLETE_URL = DEFAULT_TEST_REDIRECT_URL
-
-# ============================================================
-# 3) Page config
+# Page config
 # ============================================================
 st.set_page_config(page_title="Interview", page_icon=config.AVATAR_INTERVIEWER)
 
 # ============================================================
-# 4) API selection
+# API selection
 # ============================================================
 if "gpt" in config.MODEL.lower():
     api = "openai"
@@ -75,12 +98,10 @@ elif "claude" in config.MODEL.lower():
     api = "anthropic"
     import anthropic
 else:
-    raise ValueError(
-        "Model does not contain 'gpt' or 'claude'; unable to determine API."
-    )
+    raise ValueError("Model does not contain 'gpt' or 'claude'; unable to determine API.")
 
 # ============================================================
-# 5) Login logic (UNCHANGED)
+# Login logic (UNCHANGED)
 # ============================================================
 if config.LOGINS:
     pwd_correct, username = check_password()
@@ -91,17 +112,13 @@ else:
     st.session_state.username = "testaccount"
 
 # ============================================================
-# 6) Ensure directories exist
+# Ensure directories exist
 # ============================================================
-for d in [
-    config.TRANSCRIPTS_DIRECTORY,
-    config.TIMES_DIRECTORY,
-    config.BACKUPS_DIRECTORY,
-]:
+for d in [config.TRANSCRIPTS_DIRECTORY, config.TIMES_DIRECTORY, config.BACKUPS_DIRECTORY]:
     os.makedirs(d, exist_ok=True)
 
 # ============================================================
-# 7) Session state init
+# Session state init
 # ============================================================
 st.session_state.setdefault("interview_active", True)
 st.session_state.setdefault("messages", [])
@@ -113,35 +130,40 @@ if "start_time" not in st.session_state:
     )
 
 # ============================================================
-# 8) Completion check (keyed by storage_id)
+# Completion check (keyed by storage_id)
 # ============================================================
 interview_previously_completed = check_if_interview_completed(
     config.TIMES_DIRECTORY, st.session_state["storage_id"]
 )
 
 if interview_previously_completed and not st.session_state.messages:
-    st.session_state.interview_active = False
-    st.markdown("Interview already completed.")
+    completion_screen(
+        PROLIFIC_COMPLETE_URL,
+        title="Interview already completed.",
+        subtitle="Please return to Prolific to finish your submission.",
+    )
 
 # ============================================================
-# 9) Quit handler + button (IMPORTANT: no UI rendering after quit)
+# Quit handler + button
+#   IMPORTANT: We DO NOT append extra UI chat messages after quit.
+#   We go straight to completion_screen.
 # ============================================================
 def on_quit():
-    # Mark inactive
     st.session_state.interview_active = False
-
-    # Try saving; redirect regardless of save success
     try:
         save_interview_data(
             st.session_state["storage_id"],
             config.TRANSCRIPTS_DIRECTORY,
             config.TIMES_DIRECTORY,
         )
-    except Exception as e:
-        st.session_state["_save_error"] = str(e)
+    except Exception:
+        pass
 
-    # Arm redirect and rerun (redirect will happen at top of next run)
-    arm_redirect_and_rerun(PROLIFIC_COMPLETE_URL, reason="quit_clicked")
+    completion_screen(
+        PROLIFIC_COMPLETE_URL,
+        title="You ended the interview.",
+        subtitle="Please return to Prolific to finish your submission.",
+    )
 
 
 _, col_quit = st.columns([0.85, 0.15])
@@ -154,20 +176,16 @@ with col_quit:
     )
 
 # ============================================================
-# 10) Render prior conversation (skip system prompt and skip code messages)
+# Render prior conversation
 # ============================================================
 for message in st.session_state.messages[1:]:
-    avatar = (
-        config.AVATAR_INTERVIEWER
-        if message["role"] == "assistant"
-        else config.AVATAR_RESPONDENT
-    )
+    avatar = config.AVATAR_INTERVIEWER if message["role"] == "assistant" else config.AVATAR_RESPONDENT
     if not any(code in message["content"] for code in config.CLOSING_MESSAGES.keys()):
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
 
 # ============================================================
-# 11) API client + kwargs
+# API client + kwargs
 # ============================================================
 if api == "openai":
     client = OpenAI(api_key=st.secrets["API_KEY_OPENAI"])
@@ -183,13 +201,11 @@ if config.TEMPERATURE is not None:
     api_kwargs["temperature"] = config.TEMPERATURE
 
 # ============================================================
-# 12) Bootstrap: initial message if empty
+# Bootstrap: initial message if empty
 # ============================================================
 if not st.session_state.messages:
     if api == "openai":
-        st.session_state.messages.append(
-            {"role": "system", "content": config.SYSTEM_PROMPT}
-        )
+        st.session_state.messages.append({"role": "system", "content": config.SYSTEM_PROMPT})
         with st.chat_message("assistant", avatar=config.AVATAR_INTERVIEWER):
             stream = client.chat.completions.create(**api_kwargs)
             message_interviewer = st.write_stream(stream)
@@ -205,9 +221,7 @@ if not st.session_state.messages:
                     placeholder.markdown(message_interviewer + "▌")
             placeholder.markdown(message_interviewer)
 
-    st.session_state.messages.append(
-        {"role": "assistant", "content": message_interviewer}
-    )
+    st.session_state.messages.append({"role": "assistant", "content": message_interviewer})
 
     # Backup write (keyed by storage_id)
     save_interview_data(
@@ -219,13 +233,11 @@ if not st.session_state.messages:
     )
 
 # ============================================================
-# 13) Main interview loop
+# Main interview loop
 # ============================================================
 if st.session_state.interview_active:
     if message_respondent := st.chat_input("Your message here"):
-        st.session_state.messages.append(
-            {"role": "user", "content": message_respondent}
-        )
+        st.session_state.messages.append({"role": "user", "content": message_respondent})
 
         with st.chat_message("user", avatar=config.AVATAR_RESPONDENT):
             st.markdown(message_respondent)
@@ -242,10 +254,7 @@ if st.session_state.interview_active:
                         message_interviewer += delta
                     if len(message_interviewer) > 5:
                         placeholder.markdown(message_interviewer + "▌")
-                    if any(
-                        code in message_interviewer
-                        for code in config.CLOSING_MESSAGES.keys()
-                    ):
+                    if any(code in message_interviewer for code in config.CLOSING_MESSAGES.keys()):
                         placeholder.empty()
                         break
             else:
@@ -255,24 +264,16 @@ if st.session_state.interview_active:
                             message_interviewer += text_delta
                         if len(message_interviewer) > 5:
                             placeholder.markdown(message_interviewer + "▌")
-                        if any(
-                            code in message_interviewer
-                            for code in config.CLOSING_MESSAGES.keys()
-                        ):
+                        if any(code in message_interviewer for code in config.CLOSING_MESSAGES.keys()):
                             placeholder.empty()
                             break
 
-            # Always store the raw assistant output
-            st.session_state.messages.append(
-                {"role": "assistant", "content": message_interviewer}
-            )
+            # Always store raw assistant output
+            st.session_state.messages.append({"role": "assistant", "content": message_interviewer})
 
-            # If no code, show full response and write backup
-            if not any(
-                code in message_interviewer for code in config.CLOSING_MESSAGES.keys()
-            ):
+            # If no code: show message and backup-save
+            if not any(code in message_interviewer for code in config.CLOSING_MESSAGES.keys()):
                 placeholder.markdown(message_interviewer)
-
                 try:
                     save_interview_data(
                         username=st.session_state["storage_id"],
@@ -284,22 +285,17 @@ if st.session_state.interview_active:
                 except Exception:
                     pass
 
-            # If a closing code appears: show closing message, save final, redirect
+            # If closing code: final save + completion screen
             for code, closing_msg in config.CLOSING_MESSAGES.items():
                 if code in message_interviewer:
                     st.session_state.interview_active = False
-
-                    # Show the closing message (OK because we redirect immediately after saving)
                     st.markdown(closing_msg)
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": closing_msg}
-                    )
+                    st.session_state.messages.append({"role": "assistant", "content": closing_msg})
 
-                    # Final save loop (with timeout)
+                    # Final save loop with timeout
                     deadline = time.time() + 10.0
-                    final_transcript_stored = False
-
-                    while (not final_transcript_stored) and (time.time() < deadline):
+                    stored = False
+                    while (not stored) and (time.time() < deadline):
                         try:
                             save_interview_data(
                                 username=st.session_state["storage_id"],
@@ -309,13 +305,14 @@ if st.session_state.interview_active:
                         except Exception:
                             pass
 
-                        final_transcript_stored = check_if_interview_completed(
+                        stored = check_if_interview_completed(
                             config.TRANSCRIPTS_DIRECTORY,
                             st.session_state["storage_id"],
                         )
                         time.sleep(0.1)
 
-                    # IMPORTANT: arm redirect + rerun; do NOT keep rendering UI after this
-                    arm_redirect_and_rerun(
-                        PROLIFIC_COMPLETE_URL, reason=f"closing_code:{code}"
+                    completion_screen(
+                        PROLIFIC_COMPLETE_URL,
+                        title="Interview complete.",
+                        subtitle="Please return to Prolific to finish your submission.",
                     )
