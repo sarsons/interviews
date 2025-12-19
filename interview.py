@@ -31,7 +31,7 @@ st.session_state.setdefault("storage_id", st.session_state["PROLIFIC_PID"])
 # 1) Prolific completion redirect (robust for Streamlit Cloud)
 # ============================================================
 # TODO: Replace XXXXXX with your real completion code from Prolific
-PROLIFIC_COMPLETE_URL = "https://app.prolific.com/submissions/complete?cc=C1QA3C1R"
+PROLIFIC_COMPLETE_URL = "https://example.com"
 
 def redirect_to_prolific(url: str = PROLIFIC_COMPLETE_URL):
     """Redirect user back to Prolific (JS-based). Includes a manual fallback link."""
