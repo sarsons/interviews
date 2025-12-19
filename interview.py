@@ -125,7 +125,8 @@ for d in [config.TRANSCRIPTS_DIRECTORY, config.TIMES_DIRECTORY, config.BACKUPS_D
     os.makedirs(d, exist_ok=True)
 
 # ============================================================
-# 7) Admin download: ZIP all study data (sidebar)
+# 7) Admin download: ZIP all study data (sidebar) — LOCKED DOWN
+#    Only visible when running as ADMIN (i.e., when you open app without Prolific params)
 # ============================================================
 def build_data_zip() -> bytes:
     zip_buffer = io.BytesIO()
@@ -142,13 +143,15 @@ def build_data_zip() -> bytes:
     return zip_buffer.getvalue()
 
 with st.sidebar:
-    st.markdown("### Admin")
-    # Lightweight gate: only show for ADMIN bypass or when LOGINS=True
-    # (adjust if you want stricter gating by username)
-    is_admin_view = (st.session_state.get("PROLIFIC_PID") == "ADMIN") or config.LOGINS
+    # LOCKDOWN: only show admin tools + debug when PROLIFIC_PID == "ADMIN"
+    is_admin_view = st.session_state.get("PROLIFIC_PID") == "ADMIN"
+
     if is_admin_view:
+        st.markdown("### Admin")
+
         if st.button("Prepare study data ZIP"):
             st.session_state["_zip_bytes"] = build_data_zip()
+
         if st.session_state.get("_zip_bytes"):
             st.download_button(
                 "Download study_data.zip",
@@ -157,11 +160,11 @@ with st.sidebar:
                 mime="application/zip",
             )
 
-    st.markdown("---")
-    st.markdown("### Debug")
-    st.write("PROLIFIC_PID:", st.session_state.get("PROLIFIC_PID"))
-    st.write("storage_id:", st.session_state.get("storage_id"))
-    st.write("LOGINS:", config.LOGINS)
+        st.markdown("---")
+        st.markdown("### Debug")
+        st.write("PROLIFIC_PID:", st.session_state.get("PROLIFIC_PID"))
+        st.write("storage_id:", st.session_state.get("storage_id"))
+        st.write("LOGINS:", config.LOGINS)
 
 # ============================================================
 # 8) Session state init
