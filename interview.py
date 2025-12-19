@@ -112,6 +112,41 @@ else:
     st.session_state.username = "testaccount"
 
 # ============================================================
+# ADMIN: Download study data as ZIP (temporary / admin-only)
+# ============================================================
+import zipfile
+import io
+
+with st.sidebar:
+    if st.button("Download study data (admin)"):
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for folder in [
+                config.TRANSCRIPTS_DIRECTORY,
+                config.TIMES_DIRECTORY,
+                config.BACKUPS_DIRECTORY,
+            ]:
+                if not os.path.exists(folder):
+                    continue
+
+                for root, _, files in os.walk(folder):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        arcname = os.path.relpath(full_path)
+                        zipf.write(full_path, arcname=arcname)
+
+        zip_buffer.seek(0)
+
+        st.download_button(
+            label="Download ZIP file",
+            data=zip_buffer,
+            file_name="study_data.zip",
+            mime="application/zip",
+        )
+    
+
+# ============================================================
 # Ensure directories exist
 # ============================================================
 for d in [config.TRANSCRIPTS_DIRECTORY, config.TIMES_DIRECTORY, config.BACKUPS_DIRECTORY]:
