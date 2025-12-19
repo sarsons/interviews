@@ -17,7 +17,7 @@ from utils import (
 #   - Replace with Prolific completion URL when ready:
 #     https://app.prolific.com/submissions/complete?cc=YOURCODE
 # ============================================================
-PROLIFIC_COMPLETE_URL = "https://example.com"
+PROLIFIC_COMPLETE_URL = "https://app.prolific.com/submissions/complete?cc=C1QA3C1R"
 
 
 def completion_screen(url: str, title: str = "All done!", subtitle: str = ""):
