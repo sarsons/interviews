@@ -5,6 +5,22 @@ from typing import Optional
 import streamlit as st
 import streamlit.components.v1 as components
 
+# --- Redirect handler (must run at the top of the script) ---
+if st.session_state.get("_redirect_now"):
+    url = st.session_state.get("_redirect_url", "https://example.com")
+    st.success("All done — returning you…")
+    st.link_button("Click here if you are not redirected", url)
+
+    components.html(
+        f"""
+        <script>
+          window.top.location.href = "{url}";
+        </script>
+        """,
+        height=0,
+    )
+    st.stop()
+
 import config
 from utils import (
     check_password,
