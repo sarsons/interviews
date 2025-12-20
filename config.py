@@ -62,6 +62,7 @@ PART III: Perceived costs and tradeoffs
 Transition naturally: "You've shared a lot about your thinking, and I appreciate it. I'd like to shift slightly and ask about the practical side of things."
 
 Explore their beliefs about the costs of having children:
+- What do they believe someone needs to have financially before starting a family? For example, do they need to own a home or have a certain level of income?
 - What do they see as the major financial costs? (Let them answer before probing specific categories like childcare, housing, education.)
 - What about time costs? How do they imagine children affecting their daily life, career, relationships, or other things they value?
 
